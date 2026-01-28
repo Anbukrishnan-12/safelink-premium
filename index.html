@@ -261,17 +261,169 @@
             margin-bottom: 10px;
         }
 
+        .result-section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 20px;
+            margin: 30px 0;
+            color: white;
+        }
+
+        .result-section.loading {
+            text-align: center;
+            font-size: 1.2rem;
+        }
+
+        .result-section.error {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid rgba(255, 0, 0, 0.3);
+        }
+
+        .url-result, .company-result {
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .result-header h3 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .risk-score, .risk-level {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .score-label, .level-label {
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .score-value, .level-value {
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+
+        .url-details, .reasons, .recommendations {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .url-details h4, .reasons h4, .recommendations h4 {
+            color: white;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .detail-item {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .detail-item strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .reasons ul, .recommendations ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .reasons li, .recommendations li {
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+            transition: transform 0.3s ease;
+        }
+
+        .reasons li:hover, .recommendations li:hover {
+            transform: translateX(5px);
+        }
+
+        .result-footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .demo-features {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+        }
+
+        .demo-features h4 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .demo-features ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .demo-features li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .demo-features li:last-child {
+            border-bottom: none;
+        }
+
         @media (max-width: 768px) {
-            .header h1 {
-                font-size: 2rem;
+            .detail-grid {
+                grid-template-columns: 1fr;
             }
             
-            .input-group {
+            .risk-score, .risk-level {
                 flex-direction: column;
-            }
-            
-            .check-btn {
-                width: 100%;
+                text-align: center;
+                gap: 10px;
             }
         }
     </style>
@@ -331,6 +483,9 @@
             <p><strong>Deployment Status:</strong> COMPLETE</p>
         </div>
 
+        <!-- Results Section -->
+        <div id="result" class="result-section" style="display: none;"></div>
+
         <!-- Features -->
         <div class="features">
             <h3>🚀 Premium Features</h3>
@@ -359,7 +514,15 @@
         </div>
     </div>
 
+    <script src="url-checker.js"></script>
     <script>
+        let urlChecker;
+        
+        // Initialize URL checker when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            urlChecker = new URLSafetyChecker();
+        });
+
         function showTab(tabName) {
             // Hide all tab contents
             document.getElementById('url-section').style.display = 'none';
@@ -378,18 +541,143 @@
             }
         }
 
-        function checkURL() {
-            const url = document.getElementById('urlInput').value;
-            if (url) {
-                alert('URL Safety Check: ' + url + '\n\nThis is a demo version. Full functionality coming soon!');
+        async function checkURL() {
+            const urlInput = document.getElementById('urlInput');
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                showResult('Please enter a URL to check', 'error');
+                return;
             }
+            
+            // Show loading
+            showResult('Analyzing URL...', 'loading');
+            
+            try {
+                const result = await urlChecker.checkURL(url);
+                displayURLResult(result);
+            } catch (error) {
+                showResult('Error checking URL: ' + error.message, 'error');
+            }
+        }
+
+        function displayURLResult(result) {
+            const riskColors = {
+                'Low': '#00ff88',
+                'Medium': '#ffaa00',
+                'High': '#ff6b6b',
+                'Very High': '#ff3333'
+            };
+            
+            const riskIcons = {
+                'Low': '✅',
+                'Medium': '⚠️',
+                'High': '🚨',
+                'Very High': '❌'
+            };
+            
+            let html = `
+                <div class="url-result">
+                    <div class="result-header">
+                        <h3>${riskIcons[result.risk_level]} URL Analysis Result</h3>
+                        <div class="risk-score">
+                            <span class="score-label">Safety Score:</span>
+                            <span class="score-value" style="color: ${riskColors[result.risk_level]}">
+                                ${result.score}/100
+                            </span>
+                        </div>
+                        <div class="risk-level">
+                            <span class="level-label">Risk Level:</span>
+                            <span class="level-value" style="color: ${riskColors[result.risk_level]}">
+                                ${result.risk_level}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="url-details">
+                        <h4>📋 URL Information</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <strong>URL:</strong> ${result.url}
+                            </div>
+                            <div class="detail-item">
+                                <strong>Domain:</strong> ${result.details.domain}
+                            </div>
+                            <div class="detail-item">
+                                <strong>HTTPS:</strong> ${result.details.has_https ? '✅ Yes' : '❌ No'}
+                            </div>
+                            <div class="detail-item">
+                                <strong>Trusted:</strong> ${result.details.is_trusted ? '✅ Yes' : '❓ Unknown'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${result.reasons.length > 0 ? `
+                        <div class="reasons">
+                            <h4>🔍 Analysis Findings</h4>
+                            <ul>
+                                ${result.reasons.map(reason => `<li>${reason}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="recommendations">
+                        <h4>💡 Recommendations</h4>
+                        <ul>
+                            ${result.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div class="result-footer">
+                        <button onclick="checkAnotherURL()" class="check-btn">Check Another URL</button>
+                    </div>
+                </div>
+            `;
+            
+            showResult(html, 'result');
         }
 
         function verifyCompany() {
             const company = document.getElementById('companyInput').value;
             if (company) {
-                alert('Company Verification: ' + company + '\n\nThis is a demo version. Full functionality coming soon!');
+                showResult(`
+                    <div class="company-result">
+                        <h3>🏢 Company Verification</h3>
+                        <p><strong>Company:</strong> ${company}</p>
+                        <p><strong>Status:</strong> Demo Mode</p>
+                        <p><strong>Message:</strong> Full company verification coming soon!</p>
+                        <div class="demo-features">
+                            <h4>🚀 Coming Soon:</h4>
+                            <ul>
+                                <li>Real company database lookup</li>
+                                <li>Business registration verification</li>
+                                <li>Industry and location detection</li>
+                                <li>Trust score calculation</li>
+                            </ul>
+                        </div>
+                        <button onclick="verifyAnotherCompany()" class="check-btn">Verify Another Company</button>
+                    </div>
+                `, 'result');
             }
+        }
+
+        function showResult(content, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = content;
+            resultDiv.className = `result-section ${type}`;
+            resultDiv.style.display = 'block';
+        }
+
+        function checkAnotherURL() {
+            document.getElementById('urlInput').value = '';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('urlInput').focus();
+        }
+
+        function verifyAnotherCompany() {
+            document.getElementById('companyInput').value = '';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('companyInput').focus();
         }
 
         // Add enter key support
