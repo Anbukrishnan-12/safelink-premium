@@ -415,12 +415,121 @@
             border-bottom: none;
         }
 
+        .verification-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .verification-item {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .verification-item strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .verification-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .status-label, .score-label {
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .status-value, .score-value {
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+
+        .real-badge {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            animation: pulse 2s infinite;
+        }
+
+        .badge.real {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .badge.fake {
+            background: linear-gradient(135deg, #ff4757, #c44569);
+            color: white;
+            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .description {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .description h4 {
+            color: white;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .description p {
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.6;
+        }
+
+        .verification-info {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 15px;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+        }
+
+        .verification-info h4 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
         @media (max-width: 768px) {
             .detail-grid {
                 grid-template-columns: 1fr;
             }
             
-            .risk-score, .risk-level {
+            .verification-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .verification-status {
                 flex-direction: column;
                 text-align: center;
                 gap: 10px;
@@ -515,12 +624,15 @@
     </div>
 
     <script src="url-checker.js"></script>
+    <script src="company-verifier.js"></script>
     <script>
         let urlChecker;
+        let companyVerifier;
         
-        // Initialize URL checker when page loads
+        // Initialize checkers when page loads
         document.addEventListener('DOMContentLoaded', function() {
             urlChecker = new URLSafetyChecker();
+            companyVerifier = new CompanyVerifier();
         });
 
         function showTab(tabName) {
@@ -637,28 +749,122 @@
             showResult(html, 'result');
         }
 
-        function verifyCompany() {
-            const company = document.getElementById('companyInput').value;
-            if (company) {
-                showResult(`
-                    <div class="company-result">
-                        <h3>🏢 Company Verification</h3>
-                        <p><strong>Company:</strong> ${company}</p>
-                        <p><strong>Status:</strong> Demo Mode</p>
-                        <p><strong>Message:</strong> Full company verification coming soon!</p>
-                        <div class="demo-features">
-                            <h4>🚀 Coming Soon:</h4>
-                            <ul>
-                                <li>Real company database lookup</li>
-                                <li>Business registration verification</li>
-                                <li>Industry and location detection</li>
-                                <li>Trust score calculation</li>
-                            </ul>
+        async function verifyCompany() {
+            const companyInput = document.getElementById('companyInput');
+            const company = companyInput.value.trim();
+            
+            if (!company) {
+                showResult('Please enter a company name or URL to verify', 'error');
+                return;
+            }
+            
+            // Show loading
+            showResult('Verifying company...', 'loading');
+            
+            try {
+                const result = await companyVerifier.verifyCompany(company);
+                displayCompanyResult(result);
+            } catch (error) {
+                showResult('Error verifying company: ' + error.message, 'error');
+            }
+        }
+
+        function displayCompanyResult(result) {
+            const statusColors = {
+                'High': '#00ff88',
+                'Medium': '#ffaa00',
+                'Low': '#ff6b6b'
+            };
+            
+            const statusIcons = {
+                'High': '✅',
+                'Medium': '⚠️',
+                'Low': '❌'
+            };
+            
+            const trustColor = result.trust_score >= 80 ? '#00ff88' : 
+                              result.trust_score >= 60 ? '#ffaa00' : '#ff6b6b';
+            
+            let html = `
+                <div class="company-result">
+                    <div class="result-header">
+                        <h3>${result.logo} ${result.company_name}</h3>
+                        <div class="verification-status">
+                            <span class="status-label">Verification Status:</span>
+                            <span class="status-value" style="color: ${statusColors[result.confidence]}">
+                                ${statusIcons[result.confidence]} ${result.confidence} Confidence
+                            </span>
                         </div>
+                        <div class="trust-score">
+                            <span class="score-label">Trust Score:</span>
+                            <span class="score-value" style="color: ${trustColor}">
+                                ${result.trust_score}/100
+                            </span>
+                        </div>
+                        <div class="real-badge">
+                            ${result.is_real ? 
+                                '<span class="badge real">✅ REAL COMPANY</span>' : 
+                                '<span class="badge fake">❌ NOT VERIFIED</span>'}
+                        </div>
+                    </div>
+                    
+                    <div class="company-details">
+                        <h4>📋 Company Information</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <strong>Industry:</strong> ${result.industry}
+                            </div>
+                            <div class="detail-item">
+                                <strong>Location:</strong> ${result.location}
+                            </div>
+                            <div class="detail-item">
+                                <strong>Founded:</strong> ${result.founded_year}
+                            </div>
+                            <div class="detail-item">
+                                <strong>Employees:</strong> ${result.employee_count}
+                            </div>
+                            <div class="detail-item">
+                                <strong>Website:</strong> 
+                                ${result.website !== 'Unknown' ? 
+                                    `<a href="${result.website}" target="_blank" style="color: #667eea;">${result.website}</a>` : 
+                                    result.website}
+                            </div>
+                            <div class="detail-item">
+                                <strong>Domain:</strong> ${result.domain}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="description">
+                        <h4>📖 Description</h4>
+                        <p>${result.description}</p>
+                    </div>
+                    
+                    <div class="verification-info">
+                        <h4>🔍 Verification Details</h4>
+                        <div class="verification-grid">
+                            <div class="verification-item">
+                                <strong>Method:</strong> ${result.verification_method}
+                            </div>
+                            <div class="verification-item">
+                                <strong>Sources:</strong> ${result.sources.join(', ')}
+                            </div>
+                            <div class="verification-item">
+                                <strong>Sources Checked:</strong> ${result.sources_checked}
+                            </div>
+                            <div class="verification-item">
+                                <strong>Summary:</strong> ${result.verification_summary}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="result-footer">
                         <button onclick="verifyAnotherCompany()" class="check-btn">Verify Another Company</button>
                     </div>
-                `, 'result');
-            }
+                </div>
+            `;
+            
+            showResult(html, 'result');
         }
 
         function showResult(content, type) {
